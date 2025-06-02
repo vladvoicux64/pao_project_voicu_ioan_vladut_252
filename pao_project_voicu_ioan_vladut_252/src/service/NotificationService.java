@@ -1,88 +1,77 @@
 package service;
 
-import model.*;
-import model.Notification.NotificationType;
-import model.Reaction.ReactionType;
-
-import java.util.ArrayList;
-import java.util.Collections;
+import model.Notification;
+import model.User;
+import model.Comment;
+import model.Post;
+import model.Reaction;
+import repository.NotificationRepository;
+import java.sql.SQLException;
 import java.util.List;
 
 public class NotificationService {
-    private List<Notification> notifications;
-    private int nextNotificationId = 1;
-    
-    public NotificationService() {
-        this.notifications = new ArrayList<>();
-    }
-    
-    public Notification createCommentNotification(User commenter, User recipient, Post post) {
-        String message = commenter.getUsername() + " commented on your post: " + post.getTitle();
-        Notification notification = new Notification(nextNotificationId++, recipient, message, NotificationType.NEW_COMMENT);
-        notifications.add(notification);
-        return notification;
-    }
-    
-    public Notification createReplyNotification(User replier, User recipient, Comment originalComment) {
-        String message = replier.getUsername() + " replied to your comment";
-        Notification notification = new Notification(nextNotificationId++, recipient, message, NotificationType.NEW_COMMENT);
-        notifications.add(notification);
-        return notification;
-    }
-    
-    public Notification createReactionNotification(User reactor, User recipient, Post post, ReactionType reactionType) {
-        String message = reactor.getUsername() + " " + reactionType.toString().toLowerCase() + "d your post: " + post.getTitle();
-        Notification notification = new Notification(nextNotificationId++, recipient, message, NotificationType.NEW_REACTION);
-        notifications.add(notification);
-        return notification;
-    }
-    
-    public Notification createReactionNotification(User reactor, User recipient, Comment comment, ReactionType reactionType) {
-        String message = reactor.getUsername() + " " + reactionType.toString().toLowerCase() + "d your comment";
-        Notification notification = new Notification(nextNotificationId++, recipient, message, NotificationType.NEW_REACTION);
-        notifications.add(notification);
-        return notification;
-    }
-    
-    public Notification createSystemNotification(User recipient, String message) {
-        Notification notification = new Notification(nextNotificationId++, recipient, message, NotificationType.SYSTEM);
-        notifications.add(notification);
-        return notification;
-    }
-    
-    public List<Notification> getNotificationsForUser(User user) {
-        List<Notification> userNotifications = new ArrayList<>();
-        for (Notification notification : notifications) {
-            if (notification.getRecipient().getId() == user.getId()) {
-                userNotifications.add(notification);
-            }
-        }
-        return userNotifications;
-    }
-    
-    public List<Notification> getUnreadNotificationsForUser(User user) {
-        List<Notification> unreadNotifications = new ArrayList<>();
-        for (Notification notification : notifications) {
-            if (notification.getRecipient().getId() == user.getId() && !notification.isRead()) {
-                unreadNotifications.add(notification);
-            }
-        }
-        return unreadNotifications;
-    }
-    
-    public void markAsRead(Notification notification) {
-        notification.setRead(true);
-    }
-    
-    public void markAllAsRead(User user) {
-        for (Notification notification : notifications) {
-            if (notification.getRecipient().getId() == user.getId()) {
-                notification.setRead(true);
-            }
+    private NotificationRepository notificationRepository = new NotificationRepository();
+
+    public Notification createNotification(User recipient, String message, Notification.NotificationType type) {
+        try {
+            Notification notification = new Notification(0, recipient, message, type);
+            return notificationRepository.save(notification);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
         }
     }
-    
-    public List<Notification> getNotifications() {
-        return Collections.unmodifiableList(notifications);
+
+    public List<Notification> getNotificationsForUser(int userId) {
+        try {
+            return notificationRepository.findByRecipientId(userId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public boolean markNotificationAsRead(int notificationId) {
+        try {
+            notificationRepository.markAsRead(notificationId);
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public boolean deleteNotification(int id) {
+        try {
+            notificationRepository.delete(id);
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public void notifyNewComment(Comment comment) {
+        try {
+            User postAuthor = comment.getPost().getAuthor();
+            if (!postAuthor.equals(comment.getAuthor())) {
+                String message = comment.getAuthor().getUsername() + " commented on your post: " + comment.getPost().getTitle();
+                createNotification(postAuthor, message, Notification.NotificationType.NEW_COMMENT);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void notifyNewReaction(Reaction reaction, Post post) {
+        try {
+            User postAuthor = post.getAuthor();
+            if (!postAuthor.equals(reaction.getUser())) {
+                String message = reaction.getUser().getUsername() + " reacted to your post: " + post.getTitle();
+                createNotification(postAuthor, message, Notification.NotificationType.NEW_REACTION);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

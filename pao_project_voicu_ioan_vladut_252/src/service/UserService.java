@@ -1,114 +1,104 @@
 package service;
 
-import model.Admin;
-import model.Moderator;
 import model.User;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
+import repository.UserRepository;
+import java.sql.SQLException;
 import java.util.List;
 
 public class UserService {
-    private List<User> users;
-    private List<Admin> admins;
-    private List<Moderator> moderators;
-    
-    private int nextUserId = 1;
-    
-    public UserService() {
-        this.users = new ArrayList<>();
-        this.admins = new ArrayList<>();
-        this.moderators = new ArrayList<>();
-    }
-    
-    public User registerUser(String username, String email, String password) {
-        if (findUserByEmail(email) != null) {
-            throw new IllegalArgumentException("Email already in use");
-        }
-        
-        User user = new User(nextUserId++, username, email, password);
-        users.add(user);
-        return user;
-    }
-    
-    public Admin registerAdmin(String username, String email, String password) {
-        if (findUserByEmail(email) != null) {
-            throw new IllegalArgumentException("Email already in use");
-        }
-        
-        Admin admin = new Admin(nextUserId++, username, email, password);
-        admins.add(admin);
-        users.add(admin);
-        return admin;
-    }
-    
-    public Moderator registerModerator(String username, String email, String password) {
-        if (findUserByEmail(email) != null) {
-            throw new IllegalArgumentException("Email already in use");
-        }
-        
-        Moderator moderator = new Moderator(nextUserId++, username, email, password);
-        moderators.add(moderator);
-        users.add(moderator);
-        return moderator;
-    }
-    
-    public User findUserByEmail(String email) {
-        for (User user : users) {
-            if (user.getEmail().equals(email)) {
-                return user;
+    private UserRepository userRepository = new UserRepository();
+    private AuditService auditService = new AuditService();
+
+    public User createUser(String username, String email, String password) {
+        try {
+            User user = new User(0, username, email, password);
+            User savedUser = userRepository.save(user);
+            if (savedUser != null) {
+                auditService.logUserAction(username, "REGISTERED");
             }
+            return savedUser;
+        } catch (SQLException e) {
+            auditService.log("USER_REGISTRATION_FAILED_" + username);
+            e.printStackTrace();
+            return null;
         }
-        return null;
     }
-    
-    public User findUserById(int id) {
-        for (User user : users) {
-            if (user.getId() == id) {
-                return user;
+
+    public boolean authenticateUser(String username, String password) {
+        try {
+            User user = userRepository.findByUsername(username);
+            if (user != null && user.getPassword().equals(password) && user.isActive()) {
+                auditService.logUserAction(username, "LOGIN_SUCCESS");
+                return true;
+            } else {
+                auditService.logUserAction(username, "LOGIN_FAILED");
+                return false;
             }
+        } catch (SQLException e) {
+            auditService.log("LOGIN_ERROR_" + username);
+            e.printStackTrace();
+            return false;
         }
-        return null;
     }
-    
-    public User authenticateUser(String email, String password) {
-        User user = findUserByEmail(email);
-        if (user != null && user.getPassword().equals(password) && user.isActive()) {
-            return user;
+
+    public List<User> getAllUsers() {
+        try {
+            auditService.logSystemAction("GET_ALL_USERS");
+            return userRepository.findAll();
+        } catch (SQLException e) {
+            auditService.log("GET_ALL_USERS_FAILED");
+            e.printStackTrace();
+            return null;
         }
-        return null;
     }
-    
-    public void banUser(Admin admin, User userToBan) {
-        if (!admins.contains(admin)) {
-            throw new IllegalArgumentException("User is not an admin");
+
+    public User getUserById(int id) {
+        try {
+            auditService.logSystemAction("GET_USER_BY_ID_" + id);
+            return userRepository.findById(id);
+        } catch (SQLException e) {
+            auditService.log("GET_USER_BY_ID_FAILED_" + id);
+            e.printStackTrace();
+            return null;
         }
-        admin.banUser(userToBan);
     }
-    
-    public void unbanUser(Admin admin, User userToUnban) {
-        if (!admins.contains(admin)) {
-            throw new IllegalArgumentException("User is not an admin");
+
+    public User getUserByUsername(String username) {
+        try {
+            auditService.logSystemAction("GET_USER_BY_USERNAME_" + username);
+            return userRepository.findByUsername(username);
+        } catch (SQLException e) {
+            auditService.log("GET_USER_BY_USERNAME_FAILED_" + username);
+            e.printStackTrace();
+            return null;
         }
-        admin.unbanUser(userToUnban);
     }
-    
-    public List<User> getUsersSortedByActivity() {
-        List<User> sortedUsers = new ArrayList<>(users);
-        Collections.sort(sortedUsers, Comparator.comparing(User::getActivityScore).reversed());
-        return sortedUsers;
+
+    public boolean updateUser(User user) {
+        try {
+            userRepository.update(user);
+            auditService.logUserAction(user.getUsername(), "UPDATED");
+            return true;
+        } catch (SQLException e) {
+            auditService.log("USER_UPDATE_FAILED_" + user.getUsername());
+            e.printStackTrace();
+            return false;
+        }
     }
-    
-    public List<User> getUsers() {
-        return Collections.unmodifiableList(users);
-    }
-    
-    public List<Admin> getAdmins() {
-        return Collections.unmodifiableList(admins);
-    }
-    
-    public List<Moderator> getModerators() {
-        return Collections.unmodifiableList(moderators);
+
+    public boolean deleteUser(int id) {
+        try {
+            User user = userRepository.findById(id);
+            if (user != null) {
+                userRepository.delete(id);
+                auditService.logUserAction(user.getUsername(), "DELETED");
+                return true;
+            }
+            return false;
+        } catch (SQLException e) {
+            auditService.log("USER_DELETE_FAILED_" + id);
+            e.printStackTrace();
+            return false;
+        }
     }
 }

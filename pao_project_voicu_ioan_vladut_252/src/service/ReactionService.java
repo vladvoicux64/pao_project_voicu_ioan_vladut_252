@@ -1,77 +1,52 @@
 package service;
 
-import model.Comment;
-import model.Post;
-import model.Reaction;
-import model.Reaction.ReactionType;
-import model.User;
-
-import java.util.ArrayList;
-import java.util.List;
+import model.*;
+import repository.ReactionRepository;
+import java.sql.SQLException;
 
 public class ReactionService {
-    private int nextReactionId = 1;
-    private final NotificationService notificationService;
-    
-    public ReactionService(NotificationService notificationService) {
-        this.notificationService = notificationService;
-    }
-    
-    public Reaction addReactionToPost(User user, Post post, ReactionType type) {
-        if (!user.isActive()) {
-            throw new IllegalArgumentException("User is not active");
-        }
-        
-        for (Reaction reaction : post.getReactions()) {
-            if (reaction.getUser().getId() == user.getId()) {
-                reaction.setType(type);
-                return reaction;
+    private ReactionRepository reactionRepository = new ReactionRepository();
+    private NotificationService notificationService = new NotificationService();
+
+    public Reaction addReactionToPost(User user, Post post, Reaction.ReactionType type) {
+        try {
+            Reaction reaction = new Reaction(0, user, type);
+            Reaction savedReaction = reactionRepository.save(reaction, post.getId(), null);
+            if (savedReaction != null) {
+                createReactionNotification(user, post.getAuthor(), post, type);
             }
-        }
-        
-        Reaction reaction = new Reaction(nextReactionId++, user, type);
-        post.addReaction(reaction);
-        
-        notificationService.createReactionNotification(user, post.getAuthor(), post, type);
-        
-        return reaction;
-    }
-    
-    public Reaction addReactionToComment(User user, Comment comment, ReactionType type) {
-        if (!user.isActive()) {
-            throw new IllegalArgumentException("User is not active");
-        }
-        
-        for (Reaction reaction : comment.getReactions()) {
-            if (reaction.getUser().getId() == user.getId()) {
-                reaction.setType(type);
-                return reaction;
-            }
-        }
-        
-        Reaction reaction = new Reaction(nextReactionId++, user, type);
-        comment.addReaction(reaction);
-        
-        notificationService.createReactionNotification(user, comment.getAuthor(), comment, type);
-        
-        return reaction;
-    }
-    
-    public void removeReactionFromPost(User user, Post post) {
-        for (Reaction reaction : new ArrayList<>(post.getReactions())) {
-            if (reaction.getUser().getId() == user.getId()) {
-                post.removeReaction(reaction);
-                return;
-            }
+            return savedReaction;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
         }
     }
-    
-    public void removeReactionFromComment(User user, Comment comment) {
-        for (Reaction reaction : new ArrayList<>(comment.getReactions())) {
-            if (reaction.getUser().getId() == user.getId()) {
-                comment.removeReaction(reaction);
-                return;
+
+    public Reaction addReactionToComment(User user, Comment comment, Reaction.ReactionType type) {
+        try {
+            Reaction reaction = new Reaction(0, user, type);
+            Reaction savedReaction = reactionRepository.save(reaction, 0, comment.getId());
+            if (savedReaction != null) {
+                createReactionNotification(user, comment.getAuthor(), comment.getPost(), type);
             }
+            return savedReaction;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public void createReactionNotification(User reactor, User recipient, Post post, Reaction.ReactionType type) {
+        if (!reactor.equals(recipient)) {
+            String message = reactor.getUsername() + " reacted with " + type.toString() + " to your post: " + post.getTitle();
+            notificationService.createNotification(recipient, message, Notification.NotificationType.NEW_REACTION);
+        }
+    }
+
+    public void createReactionNotification(User reactor, User recipient, Comment comment, Reaction.ReactionType type) {
+        if (!reactor.equals(recipient)) {
+            String message = reactor.getUsername() + " reacted with " + type.toString() + " to your comment";
+            notificationService.createNotification(recipient, message, Notification.NotificationType.NEW_REACTION);
         }
     }
 }

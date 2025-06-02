@@ -1,87 +1,60 @@
 package service;
 
 import model.Category;
-import model.Topic;
-import model.User;
-
-import java.util.ArrayList;
-import java.util.Collections;
+import repository.CategoryRepository;
+import java.sql.SQLException;
 import java.util.List;
 
 public class CategoryService {
-    private List<Category> categories;
-    private List<Topic> topics;
-    
-    private int nextCategoryId = 1;
-    private int nextTopicId = 1;
-    
-    public CategoryService() {
-        this.categories = new ArrayList<>();
-        this.topics = new ArrayList<>();
-    }
+    private CategoryRepository categoryRepository = new CategoryRepository();
     
     public Category createCategory(String name, String description) {
-        for (Category category : categories) {
-            if (category.getName().equalsIgnoreCase(name)) {
-                throw new IllegalArgumentException("Category with this name already exists");
-            }
+        try {
+            Category category = new Category(0, name, description);
+            return categoryRepository.save(category);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
         }
-        
-        Category category = new Category(nextCategoryId++, name, description);
-        categories.add(category);
-        return category;
     }
     
-    public Topic createTopic(String title, String description, User creator, Category category) {
-        if (!categories.contains(category)) {
-            throw new IllegalArgumentException("Category does not exist in the system");
+    public Category getCategoryById(int id) {
+        try {
+            return categoryRepository.findById(id);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
         }
-        
-        Topic topic = new Topic(nextTopicId++, title, description, creator, category);
-        topics.add(topic);
-        category.addTopic(topic);
-        return topic;
     }
     
-    public Category findCategoryById(int id) {
-        for (Category category : categories) {
-            if (category.getId() == id) {
-                return category;
-            }
+    public List<Category> getAllCategories() {
+        try {
+            return categoryRepository.findAll();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
         }
-        return null;
     }
     
-    public Category findCategoryByName(String name) {
-        for (Category category : categories) {
-            if (category.getName().equalsIgnoreCase(name)) {
-                return category;
-            }
+    public boolean updateCategory(Category category) {
+        try {
+            categoryRepository.update(category);
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
         }
-        return null;
     }
     
-    public Topic findTopicById(int id) {
-        for (Topic topic : topics) {
-            if (topic.getId() == id) {
-                return topic;
-            }
+    public boolean deleteCategory(int id) {
+        try {
+            categoryRepository.delete(id);
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
         }
-        return null;
-    }
-    
-    public List<Topic> getTopicsForCategory(Category category) {
-        if (!categories.contains(category)) {
-            throw new IllegalArgumentException("Category does not exist in the system");
-        }
-        return category.getTopics();
-    }
-    
-    public List<Category> getCategories() {
-        return Collections.unmodifiableList(categories);
-    }
-    
-    public List<Topic> getTopics() {
-        return Collections.unmodifiableList(topics);
     }
 }
+
+

@@ -1,62 +1,53 @@
 package service;
 
 import model.Post;
-import model.Tag;
-
-import java.util.ArrayList;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.stream.Collectors;
 
 public class SearchService {
-    private final PostService postService;
-    private final TagService tagService;
-    
-    public SearchService(PostService postService, TagService tagService) {
+    private PostService postService;
+
+    public SearchService(PostService postService) {
         this.postService = postService;
-        this.tagService = tagService;
     }
-    
+
     public List<Post> searchPostsByKeyword(String keyword) {
-        if (keyword == null || keyword.trim().isEmpty()) {
+        List<Post> allPosts = postService.getAllPosts();
+        if (allPosts == null) {
             return new ArrayList<>();
         }
-        
-        String lowercaseKeyword = keyword.toLowerCase();
-        List<Post> result = new ArrayList<>();
-        
-        for (Post post : postService.getPosts()) {
-            if (post.getTitle().toLowerCase().contains(lowercaseKeyword) || 
-                post.getContent().toLowerCase().contains(lowercaseKeyword)) {
-                result.add(post);
-            }
-        }
-        
-        return result;
+
+        return allPosts.stream()
+                .filter(post -> post.getTitle().toLowerCase().contains(keyword.toLowerCase()) ||
+                        post.getContent().toLowerCase().contains(keyword.toLowerCase()))
+                .collect(Collectors.toList());
     }
-    
+
     public List<Post> searchPostsByTag(String tagName) {
-        Tag tag = tagService.findTagByName(tagName);
-        if (tag == null) {
+        List<Post> allPosts = postService.getAllPosts();
+        if (allPosts == null) {
             return new ArrayList<>();
         }
-        
-        List<Post> result = new ArrayList<>();
-        for (Post post : postService.getPosts()) {
-            if (post.getTags().contains(tag)) {
-                result.add(post);
-            }
-        }
-        
-        return result;
+
+        return allPosts.stream()
+                .filter(post -> post.getTags().stream()
+                        .anyMatch(tag -> tag.getName().equalsIgnoreCase(tagName)))
+                .collect(Collectors.toList());
     }
-    
-    public List<Post> searchPostsByAuthor(String authorName) {
-        List<Post> result = new ArrayList<>();
-        for (Post post : postService.getPosts()) {
-            if (post.getAuthor().getUsername().toLowerCase().contains(authorName.toLowerCase())) {
-                result.add(post);
-            }
+
+    public List<Post> searchPostsByAuthor(String authorUsername) {
+        List<Post> allPosts = postService.getAllPosts();
+        if (allPosts == null) {
+            return new ArrayList<>();
         }
-        
-        return result;
+
+        return allPosts.stream()
+                .filter(post -> post.getAuthor().getUsername().equalsIgnoreCase(authorUsername))
+                .collect(Collectors.toList());
+    }
+
+    public List<Post> getPosts() {
+        return postService.getAllPosts();
     }
 }

@@ -1,145 +1,198 @@
 package service;
 
 import model.*;
-import model.Reaction.ReactionType;
-
 import java.util.List;
-import java.util.Set;
+
 
 public class ForumFacade {
     private final UserService userService;
     private final CategoryService categoryService;
+    private final TopicService topicService;
     private final PostService postService;
     private final CommentService commentService;
-    private final ReactionService reactionService;
     private final NotificationService notificationService;
-    private final TagService tagService;
-    private final SearchService searchService;
-    
+    private final AdminService adminService;
+    private final ModeratorService moderatorService;
+
     public ForumFacade() {
-        this.tagService = new TagService();
-        this.notificationService = new NotificationService();
         this.userService = new UserService();
         this.categoryService = new CategoryService();
-        this.postService = new PostService(tagService);
-        this.commentService = new CommentService(notificationService);
-        this.reactionService = new ReactionService(notificationService);
-        this.searchService = new SearchService(postService, tagService);
+        this.topicService = new TopicService();
+        this.postService = new PostService();
+        this.commentService = new CommentService();
+        this.notificationService = new NotificationService();
+        this.adminService = new AdminService();
+        this.moderatorService = new ModeratorService();
     }
-    
-    // User operations
+
     public User registerUser(String username, String email, String password) {
-        return userService.registerUser(username, email, password);
+        return userService.createUser(username, email, password);
     }
-    
-    public Admin registerAdmin(String username, String email, String password) {
-        return userService.registerAdmin(username, email, password);
+
+    public User authenticateUser(String username, String password) {
+        if (userService.authenticateUser(username, password)) {
+            return userService.getUserByUsername(username);
+        }
+        return null;
     }
-    
-    public Moderator registerModerator(String username, String email, String password) {
-        return userService.registerModerator(username, email, password);
+
+    public boolean banUser(int userId) {
+        return adminService.banUser(userId);
     }
-    
-    public User authenticateUser(String email, String password) {
-        return userService.authenticateUser(email, password);
+
+    public boolean unbanUser(int userId) {
+        return adminService.unbanUser(userId);
     }
-    
-    public void banUser(Admin admin, User userToBan) {
-        userService.banUser(admin, userToBan);
+
+    public List<User> getBannedUsers() {
+        return adminService.getBannedUsers();
     }
-    
-    // Category and Topic operations
+
     public Category createCategory(String name, String description) {
         return categoryService.createCategory(name, description);
     }
-    
-    public Topic createTopic(String title, String description, User creator, Category category) {
-        return categoryService.createTopic(title, description, creator, category);
+
+    public List<Category> getAllCategories() {
+        return categoryService.getAllCategories();
     }
-    
-    // Post operations
+
+    public Topic createTopic(String title, String description, User creator, Category category) {
+        return topicService.createTopic(title, description, creator, category);
+    }
+
+    public List<Topic> getTopicsByCategory(int categoryId) {
+        return topicService.getTopicsByCategory(categoryId);
+    }
+
     public Post createPost(String title, String content, User author, Topic topic) {
         return postService.createPost(title, content, author, topic);
     }
-    
-    public void addTagToPost(Post post, String tagName) {
-        postService.addTagToPost(post, tagName);
+
+    public Post getPostById(int id) {
+        return postService.getPostById(id);
     }
-    
-    // Comment operations
+
+    public List<Post> getPostsByTopic(int topicId) {
+        return postService.getPostsByTopic(topicId);
+    }
+
+    public List<Post> getPostsByAuthor(int authorId) {
+        return postService.getPostsByAuthor(authorId);
+    }
+
+    public boolean deletePost(int postId) {
+        return postService.deletePost(postId);
+    }
+
     public Comment addCommentToPost(String content, User author, Post post) {
-        return commentService.addCommentToPost(content, author, post);
+        Comment comment = commentService.createComment(content, author, post);
+        if (comment != null) {
+            notificationService.notifyNewComment(comment);
+        }
+        return comment;
     }
-    
+
     public Comment replyToComment(String content, User author, Post post, Comment parentComment) {
-        return commentService.replyToComment(content, author, post, parentComment);
+        return commentService.createReply(content, author, post, parentComment);
     }
-    
-    // Reaction operations
-    public Reaction addReactionToPost(User user, Post post, ReactionType type) {
-        return reactionService.addReactionToPost(user, post, type);
+
+    public List<Comment> getCommentsByPost(int postId) {
+        return commentService.getCommentsByPost(postId);
     }
-    
-    public Reaction addReactionToComment(User user, Comment comment, ReactionType type) {
-        return reactionService.addReactionToComment(user, comment, type);
+
+    public boolean deleteComment(int commentId) {
+        return commentService.deleteComment(commentId);
     }
-    
-    // Search operations
-    public List<Post> searchPostsByKeyword(String keyword) {
-        return searchService.searchPostsByKeyword(keyword);
+
+    public Notification createNotification(User recipient, String message, Notification.NotificationType type) {
+        return notificationService.createNotification(recipient, message, type);
     }
-    
-    public List<Post> searchPostsByTag(String tagName) {
-        return searchService.searchPostsByTag(tagName);
+
+    public List<Notification> getNotificationsForUser(int userId) {
+        return notificationService.getNotificationsForUser(userId);
     }
-    
-    // Sorting operations
-    public List<Post> getPostsSortedByPopularity() {
-        return postService.getPostsSortedByPopularity();
+
+    public boolean markNotificationAsRead(int notificationId) {
+        return notificationService.markNotificationAsRead(notificationId);
     }
-    
-    public List<User> getUsersSortedByActivity() {
-        return userService.getUsersSortedByActivity();
+
+    public List<User> getAllUsers() {
+        return userService.getAllUsers();
     }
-    
-    // Getters for collections
-    public List<User> getUsers() {
-        return userService.getUsers();
+
+    public User getUserById(int id) {
+        return userService.getUserById(id);
     }
-    
-    public List<Admin> getAdmins() {
-        return userService.getAdmins();
+
+    public User getUserByUsername(String username) {
+        return userService.getUserByUsername(username);
     }
-    
-    public List<Moderator> getModerators() {
-        return userService.getModerators();
+
+    public boolean updateUser(User user) {
+        return userService.updateUser(user);
     }
-    
-    public List<Category> getCategories() {
-        return categoryService.getCategories();
+
+    public boolean deleteUser(int id) {
+        return userService.deleteUser(id);
     }
-    
-    public List<Topic> getTopics() {
-        return categoryService.getTopics();
+
+    public Category getCategoryById(int id) {
+        return categoryService.getCategoryById(id);
     }
-    
-    public List<Post> getPosts() {
-        return postService.getPosts();
+
+    public boolean updateCategory(Category category) {
+        return categoryService.updateCategory(category);
     }
-    
-    public List<Comment> getComments() {
-        return commentService.getComments();
+
+    public boolean deleteCategory(int id) {
+        return categoryService.deleteCategory(id);
     }
-    
-    public Set<Tag> getTags() {
-        return tagService.getTags();
+
+    public Topic getTopicById(int id) {
+        return topicService.getTopicById(id);
     }
-    
-    public List<Notification> getNotifications() {
-        return notificationService.getNotifications();
+
+    public boolean updateTopic(Topic topic) {
+        return topicService.updateTopic(topic);
     }
-    
-    public List<Notification> getUnreadNotificationsForUser(User user) {
-        return notificationService.getUnreadNotificationsForUser(user);
+
+    public boolean deleteTopic(int id) {
+        return topicService.deleteTopic(id);
+    }
+
+    public List<Post> getAllPosts() {
+        return postService.getAllPosts();
+    }
+
+    public boolean updatePost(Post post) {
+        return postService.updatePost(post);
+    }
+
+    public Comment getCommentById(int id) {
+        return commentService.getCommentById(id);
+    }
+
+    public boolean updateComment(Comment comment) {
+        return commentService.updateComment(comment);
+    }
+
+    public boolean addModeratedCategory(int moderatorId, int categoryId) {
+        return moderatorService.addModeratedCategory(moderatorId, categoryId);
+    }
+
+    public boolean removeModeratedCategory(int moderatorId, int categoryId) {
+        return moderatorService.removeModeratedCategory(moderatorId, categoryId);
+    }
+
+    public List<Category> getModeratedCategories(int moderatorId) {
+        return moderatorService.getModeratedCategories(moderatorId);
+    }
+
+    public boolean promoteToModerator(int userId) {
+        return adminService.promoteToModerator(userId);
+    }
+
+    public boolean promoteToAdmin(int userId) {
+        return adminService.promoteToAdmin(userId);
     }
 }
